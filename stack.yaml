@@ -1,0 +1,17 @@
+resolver: lts-14.27
+packages:
+- .
+- ../fei-base/
+- ../tuple-ops
+extra-deps:
+- git: https://github.com/0xCM/type-combinators.git
+  commit: 58167dd4017b666ff592bb9493b0570a054aabdb
+extra-include-dirs:
+- /home/jiasen/workspace/mxnet/build-1.6.0/include
+extra-lib-dirs:
+- /home/jiasen/workspace/mxnet/build-1.6.0
+flags:
+  fei-base:
+    mxnet_geq_10600: true
+  fei-einops:
+    mxnet: true
