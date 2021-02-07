@@ -22,13 +22,18 @@ library
   build-depends:       base >= 4.7 && < 5,
                        lens < 5,
                        rio < 0.2,
+                       mtl < 3,
                        attoparsec < 0.14,
-                       containers < 0.7
+                       containers < 0.7,
+                       mfsolve
   if flag(mxnet) {
-      build-depends:   fei-base
+      build-depends:   fei-base, fei-nn
+      cpp-options:     -DMXNET
+      other-modules:   Fei.Einops.MXNet
   }
   hs-source-dirs:      src
-  exposed-modules:     
+  exposed-modules:     Fei.Einops.Operation,
+                       Fei.Einops
   other-modules:       Fei.Einops.Expression
   default-language:    Haskell2010
   default-extensions:  FlexibleContexts,
