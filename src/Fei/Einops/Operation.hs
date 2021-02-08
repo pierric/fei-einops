@@ -1,8 +1,14 @@
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedLabels      #-}
 module Fei.Einops.Operation where
 
 import           Control.Lens          (_1, ix, (^?!))
+import           GHC.OverloadedLabels  (IsLabel (..))
+import           GHC.TypeLits          (KnownSymbol, Symbol, symbolVal)
 import           RIO
 import qualified RIO.HashMap           as M
+import qualified RIO.Text              as T
 
 import           Fei.Einops.Expression
 
@@ -12,13 +18,18 @@ class (MonadIO (ExecutionMonad t), MonadThrow (ExecutionMonad t)) => TensorType 
     tensorReshape :: [Int] -> t -> ExecutionMonad t t
     tensorTranpose :: [Int] -> t -> ExecutionMonad t t
 
-rearrange :: TensorType t => t -> [Int] -> Text -> [(Text, Int)] -> ExecutionMonad t t
+instance KnownSymbol x => IsLabel (x :: Symbol) Axis where
+    fromLabel = Axis (T.pack $ symbolVal (Proxy :: Proxy x))
+
+(.==) :: Axis -> Int -> (Axis, Int)
+(.==) = (,)
+
+rearrange :: TensorType t => t -> [Int] -> Text -> [(Axis, Int)] -> ExecutionMonad t t
 rearrange tensor shape expr dims =
     case parse expr of
       Left err -> throwM err
-      Right e@(Expr left right) -> do
-          let daxes = map (_1 %~ Axis) dims
-          case solve e shape daxes of
+      Right e@(Expr left right) ->
+          case solve e shape dims of
             Left err -> throwM err
             Right [h0, h1] -> do
               let src_shape = expandHead h0
