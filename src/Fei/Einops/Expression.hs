@@ -31,6 +31,10 @@ data Error = DuplicatedAxes (Head Axis)
 
 instance Exception Error
 
+isEllipse :: Term a -> Bool
+isEllipse (Ellipse _) = True
+isEllipse _           = False
+
 axes :: Head a -> [a]
 axes (Head ts) =
     let vars (Sing v)     = [v]
