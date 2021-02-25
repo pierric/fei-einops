@@ -21,15 +21,15 @@ data Expr = Expr (Head Axis) (Head Axis)
 
 data Mode = ModeRearrange
 
-data Error = DuplicatedAxes (Head Axis)
-           | DifferentAxes [Axis] [Axis]
-           | ParsingError String
-           | InvalidAxis [Axis]
-           | Unsolvable (Solver.DepError Axis Float)
-           | UnresolvedDim [Axis]
+data ExprError = DuplicatedAxes (Head Axis)
+               | DifferentAxes [Axis] [Axis]
+               | ParsingError String
+               | InvalidAxis [Axis]
+               | Unsolvable (Solver.DepError Axis Float)
+               | UnresolvedDim [Axis]
     deriving (Show)
 
-instance Exception Error
+instance Exception ExprError
 
 isEllipse :: Term a -> Bool
 isEllipse (Ellipse _) = True
@@ -41,12 +41,11 @@ axes (Head ts) =
         vars (Ellipse vs) = vs
      in concatMap vars ts
 
-_check :: Mode -> Expr -> Either Error Expr
+_check :: Mode -> Expr -> Either ExprError Expr
 _check ModeRearrange expr@(Expr left right)
-
   | set_lv /= set_rv = Left $ DifferentAxes lv rv
-  | length set_lv /= Set.size set_lv = Left $ DuplicatedAxes left
-  | length set_rv /= Set.size set_rv = Left $ DuplicatedAxes right
+  | length lv /= Set.size set_lv = Left $ DuplicatedAxes left
+  | length rv /= Set.size set_rv = Left $ DuplicatedAxes right
   | otherwise = Right expr
 
     where
@@ -55,7 +54,7 @@ _check ModeRearrange expr@(Expr left right)
         set_lv = Set.fromList lv
         set_rv = Set.fromList rv
 
-parse :: Text -> Either Error Expr
+parse :: Text -> Either ExprError Expr
 parse text = P.parseOnly expr text & _Left %~ ParsingError >>= _check ModeRearrange
     where
         var  = do
@@ -92,7 +91,7 @@ makeVariables (Expr left right) = foldl' add M.empty all_axes
         all_axes   = left_axes ++ right_axes
         add m a = M.insertWith (flip const) a (Solver.makeVariable a) m
 
-solve :: Expr -> [Int] -> [(Axis, Int)] -> Either Error [Head Int]
+solve :: Expr -> [Int] -> [(Axis, Int)] -> Either ExprError [Head Int]
 solve expr@(Expr left right) input knowns = do
     _check ModeRearrange expr
     let vars   = makeVariables expr
@@ -105,7 +104,7 @@ solve expr@(Expr left right) input knowns = do
         eq (e, i) = e Solver.=== (Solver.makeConstant $ fromIntegral i)
     solution <- _Left %~ Unsolvable $ flip Solver.execSolver Solver.noDeps $ do
         mapM_ eq $ zip (reduceHead leftEs) input
-        mapM_ eq knEs
+        mapM_ (Solver.ignore . eq) knEs
     let kwn    = M.fromList $ map (_2 %~ floor) $ Solver.knownVars solution
         leftS  = (kwn ^?!) . ix <$> left
         rightS = (kwn ^?!) . ix <$> right
