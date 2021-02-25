@@ -5,6 +5,7 @@ module Fei.Einops.Operation where
 
 import           Control.Lens          (_1, ix, (^?!))
 import           GHC.OverloadedLabels  (IsLabel (..))
+import           GHC.Stack
 import           GHC.TypeLits          (KnownSymbol, Symbol, symbolVal)
 import           RIO
 import qualified RIO.HashMap           as M
@@ -13,6 +14,12 @@ import qualified RIO.Text              as T
 import           Fei.Einops.Expression
 
 data ReshapeDirection = ReshapeExpand | ReshapeReduce
+
+data RearrangeError = RearrangeError CallStack ExprError
+
+instance Show RearrangeError where
+    show (RearrangeError cb err) = show err ++ "\n" ++ prettyCallStack cb
+instance Exception RearrangeError
 
 class (MonadIO (ExecutionMonad t), MonadThrow (ExecutionMonad t)) => TensorType t where
     type ExecutionMonad t :: * -> *
@@ -25,13 +32,14 @@ class (MonadIO (ExecutionMonad t), MonadThrow (ExecutionMonad t)) => TensorType 
 instance KnownSymbol x => IsLabel (x :: Symbol) Axis where
     fromLabel = Axis (T.pack $ symbolVal (Proxy :: Proxy x))
 
+infix 5 .==
 (.==) :: Axis -> Int -> (Axis, Int)
 (.==) = (,)
 
-rearrange :: TensorType t => t -> Text -> [(Axis, Int)] -> ExecutionMonad t t
+rearrange :: HasCallStack => TensorType t => t -> Text -> [(Axis, Int)] -> ExecutionMonad t t
 rearrange tensor expr dims =
     case parse expr of
-      Left err -> throwM err
+      Left err -> throwM $ RearrangeError callStack err
       Right e@(Expr left right) -> do
           let laxes     = axes left
               raxes     = axes right
@@ -50,7 +58,7 @@ rearrange tensor expr dims =
             -- we have the shape of tensor, and we can solve the equation
             Just shape -> do
                 case solve e shape dims of
-                  Left err -> throwM err
+                  Left err -> throwM $ RearrangeError callStack err
                   Right [h0, h1] -> do
                       let src_shape = expandHead h0
                           dst_shape = reduceHead h1
