@@ -6,8 +6,9 @@ import           Control.Lens          (ix, (^?))
 import           Data.Monoid           (Sum (..))
 import           MXNet.Base            (DType, NDArray (..), Symbol,
                                         SymbolHandle, ndshape)
-import           MXNet.Base.Tensor
-import           MXNet.NN.Layer        (reshape, transpose)
+import           MXNet.Base.Tensor     (PrimTensorOp, TensorMonad, reshape,
+                                        transpose)
+import           MXNet.NN.Layer        ()
 import           RIO                   hiding ((^?))
 import qualified RIO.HashMap           as M
 import qualified RIO.List              as L (groupBy)
