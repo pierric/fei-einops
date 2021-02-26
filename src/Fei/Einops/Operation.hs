@@ -36,7 +36,7 @@ infix 5 .==
 (.==) :: Axis -> Int -> (Axis, Int)
 (.==) = (,)
 
-rearrange :: HasCallStack => TensorType t => t -> Text -> [(Axis, Int)] -> ExecutionMonad t t
+rearrange :: (HasCallStack, TensorType t) => t -> Text -> [(Axis, Int)] -> ExecutionMonad t t
 rearrange tensor expr dims =
     case parse expr of
       Left err -> throwM $ RearrangeError callStack err
