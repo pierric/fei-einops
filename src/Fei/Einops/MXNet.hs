@@ -4,28 +4,27 @@ module Fei.Einops.MXNet where
 
 import           Control.Lens          (ix, (^?))
 import           Data.Monoid           (Sum (..))
-import           MXNet.Base            (DType, NDArray (..), Symbol,
+import           MXNet.Base            (DType, NDArray (..), Symbol (..),
                                         SymbolHandle, ndshape)
 import           MXNet.Base.Tensor     (PrimTensorOp, TensorMonad, reshape,
-                                        transpose)
+                                        reshapeLegacy, transpose)
 import           MXNet.NN.Layer        ()
 import           RIO                   hiding ((^?))
 import qualified RIO.HashMap           as M
 import qualified RIO.List              as L (groupBy)
-import qualified RIO.NonEmpty          as NE
 
 import           Fei.Einops.Expression
 import           Fei.Einops.Operation
 
 
-data ReshapeOp =
-      AxisKnown Int          -- a known axis
-    | AxisCopy               -- copy the axis: (0,)
-    | AxisSplitL Int         -- split into 2 with a known left:  (-4, n, -1)
-    | AxisSplitR Int         -- split into 2 with a known right: (-4, -1, n)
-    | AxisSplitM [Int]       -- split into a list of known axes: (n, m, l, ..)
-    | AxisSplitU [Int] [Int] -- split into at most one unknown axis
-    | AxisMerge              -- merge 2 axes: (-3,)
+data ReshapeOp
+  = AxisKnown Int -- a known axis
+  | AxisCopy -- copy the axis: (0,)
+  | AxisSplitL Int -- split into 2 with a known left:  (-4, n, -1)
+  | AxisSplitR Int -- split into 2 with a known right: (-4, -1, n)
+  | AxisSplitM [Int] -- split into a list of known axes: (n, m, l, ..)
+  | AxisSplitU [Int] [Int] -- split into at most one unknown axis
+  | AxisMerge -- merge 2 axes: (-3,)
 
 termsToOps :: ReshapeDirection -> HashMap Axis Int -> [Term Axis] -> Maybe [ReshapeOp]
 termsToOps dir knowns terms = mapM each terms
@@ -81,16 +80,17 @@ numSplitU = getSum . mconcat . map (Sum . isAxisSplitU)
         isAxisSplitU (AxisSplitU _ _ ) = 1
         isAxisSplitU _                 = 0
 
-data ReshapeSymError = CannotReshape [Term Axis] [(Axis, Int)]
-    deriving Show
+data ReshapeSymError
+  = CannotReshape [Term Axis] [(Axis, Int)]
+  deriving (Show)
 
 instance Exception ReshapeSymError
 
-class (MonadIO (TensorMonad t), MonadThrow (TensorMonad t), PrimTensorOp t t) => MXTensor t where
-    mxGetShape   :: t -> IO (Maybe [Int])
-    mxReshapeSym :: ReshapeDirection -> Head Axis -> [(Axis, Int)] -> t -> TensorMonad t t
+class (MonadThrow (TensorMonad t), PrimTensorOp t) => MXTensor t where
+    mxGetShape   :: DType u => t u -> IO (Maybe [Int])
+    mxReshapeSym :: DType u => ReshapeDirection -> Head Axis -> [(Axis, Int)] -> t u -> TensorMonad t (t u)
 
-instance MXTensor SymbolHandle where
+instance MXTensor Symbol where
     mxGetShape _ = return Nothing
     mxReshapeSym dir (Head terms) knowns sym = do
         -- given a head, say 'c (w h)', we shall reshape a symbol of shape [c, w*h] to
@@ -113,14 +113,15 @@ instance MXTensor SymbolHandle where
             | numSplitU ops > 1 -> throwM $ CannotReshape terms knowns
             | otherwise -> do
                 let code = concatMap opToCode ops
-                reshape code sym
+                reshapeLegacy code sym
 
-instance DType a => MXTensor (NDArray a) where
-    mxGetShape t = ndshape t >>= return . Just . NE.toList
+instance MXTensor NDArray where
+    mxGetShape t = ndshape t >>= return . Just
     mxReshapeSym = error "No need to reshape a NDArray symolically."
 
-instance (MXTensor t, MonadIO (TensorMonad t), MonadThrow (TensorMonad t), PrimTensorOp t t) => TensorType t where
-    type ExecutionMonad t = TensorMonad t
+instance (MXTensor t, MonadThrow (TensorMonad t), PrimTensorOp t, DType a)
+  => TensorType (t a) where
+    type ExecutionMonad (t a) = TensorMonad t
     tensorGetShape = liftIO . mxGetShape
     tensorReshapeSym = mxReshapeSym
     tensorReshape  = reshape
