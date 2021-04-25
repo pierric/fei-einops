@@ -7,4 +7,4 @@ For example:
 - `rearrange t "(b n) c -> b n c" [#b .== 2]` will reshape the tensor by decompose the 1st axis into 2, where the new axis `n` is calculated automatically.
 - ...
 
-In most cases, the tensor can be `SymbolHandle`, `NDArrayHandle`, `NDArray` for mxnet.
+In most cases, the tensor can be `Symbol`, `NDArray` for mxnet.
