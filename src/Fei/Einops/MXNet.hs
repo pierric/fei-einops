@@ -25,6 +25,7 @@ data ReshapeOp
   | AxisSplitM [Int] -- split into a list of known axes: (n, m, l, ..)
   | AxisSplitU [Int] [Int] -- split into at most one unknown axis
   | AxisMerge -- merge 2 axes: (-3,)
+  deriving (Show)
 
 termsToOps :: ReshapeDirection -> HashMap Axis Int -> [Term Axis] -> Maybe [ReshapeOp]
 termsToOps dir knowns terms = mapM each terms
@@ -42,6 +43,7 @@ termsToOps dir knowns terms = mapM each terms
              in case () of
                   _ | num > 2 ->
                       case seg of
+                         -- TODO AxisSplitM is likely wrong when the ellipse is not at the end
                          [js] -> pure $ AxisSplitM (chopJust js)
                          [[Nothing], js] -> pure $ AxisSplitU [] (chopJust js)
                          [js, [Nothing]] -> pure $ AxisSplitU (chopJust js) []
@@ -51,7 +53,8 @@ termsToOps dir knowns terms = mapM each terms
                         case vs of
                           [Nothing, Just v] -> pure $ AxisSplitR v
                           [Just v, Nothing] -> pure $ AxisSplitL v
-                          [Just u, Just v]  -> pure $ AxisSplitM [u, v]
+                          [Just u, Just v]  -> -- cannot use AxisSplitM if not at the end
+                                               pure $ AxisSplitL u
                           _                 -> Nothing
                   _ -> Nothing
 

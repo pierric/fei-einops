@@ -13,7 +13,7 @@ import qualified RIO.Text              as T
 
 import           Fei.Einops.Expression
 
-data ReshapeDirection = ReshapeExpand | ReshapeReduce
+data ReshapeDirection = ReshapeExpand | ReshapeReduce deriving (Show)
 
 data RearrangeError = RearrangeError CallStack ExprError
 
@@ -52,7 +52,7 @@ rearrange tensor expr dims =
             -- the backend. So we resort everything to the backend side.
             Nothing -> do
                 tensor <- tensorReshapeSym ReshapeExpand left dims tensor
-                tensor <- tensorTranpose mapping   tensor
+                tensor <- tensorTranpose mapping tensor
                 tensor <- tensorReshapeSym ReshapeReduce right dims tensor
                 return tensor
             -- we have the shape of tensor, and we can solve the equation
